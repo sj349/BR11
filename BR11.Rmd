@@ -1,7 +1,9 @@
 ---
 title: "BR11"
 author: "Steph Jordan"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r}
@@ -39,7 +41,9 @@ a. The relationship between tomato size and age varies depending on the type of 
 b. B3 represents the differences in the relationship between age and weight for the 2 different types of tomatoes (the different slopes that each of these relationships possess).
 
 ## Exercise 11.5
-sketching
+![11.5](/Users/stephjordan/Downloads/IMG-2189.jpg)
+
+
 
 ## Exercise 11.6
 
@@ -152,6 +156,8 @@ prediction <- posterior_predict(
 mcmc_areas(prediction) +
   xlab("body_mass_g")
 ```
+
+
 The body_mass of an Adelie penguin with flipper length 197 is around 3700, with likely values ranging from 3250 to 4000.
 
 ## Exercise 11.11
@@ -184,13 +190,8 @@ c. Using tidy() summary
 tidy(penguin_model_2, effects = c("fixed", "aux"),
      conf.int = TRUE, conf.level = 0.80)
 ```
-Let's also look at the error summary
-```{r}
-prediction_summary_cv(model = penguin_model_2, data = penguin_data, k = 10)
-```
 
-
-The coefficient for the speciesGentoo term changed significantly with the interaction term included in the regression model (from 234 to -3899) despite the fact that we used the same priors (so the only difference between the two models was the interaction term). Therefore, the interaction must have a strong effect, for when we allow the interaction to be present, the species coefficient changes in value greatly. (CHECK ERROR STATS)
+The coefficient for the speciesGentoo term changed significantly with the interaction term included in the regression model (from 234 to -3899) despite the fact that we used the same priors (so the only difference between the two models was the interaction term). Therefore, the interaction must have a strong effect, for when we allow the interaction to be present, the species coefficient changes in value greatly. (CHECK THIS LOGIC )
 
 
 ## Exercise 11.12
@@ -291,44 +292,77 @@ c(loo_1$estimates[1], loo_2$estimates[1],
 
 ```
 
-e. 
+```{r}
+loo_compare(loo_1, loo_2, loo_3, loo_4)
+```
+
+
+e. The 4th model (in our code, penguin_model_7) has the lowest MAE_scaled (0.722), and the highest percentage of values within the 50% posterior predicted interval. The 4th model also has the best ELPD (the larger the ELPD, the more accurate the predictions)--we know this because loo_compare outputs the best model, and then lists all other models in comparison to the best model. Therefore, I would say the 4th model is the best.
+
+
 ## Exercise 11.14
+First, let's look at the relationship between bill_length and bill_depth
+```{r}
+penguin_data <- penguin_data |> drop_na()
+ggplot(penguin_data, aes(x = bill_depth_mm, y = bill_length_mm)) +
+ geom_point() + 
+  geom_smooth(method = "lm", se = FALSE)
+
+```
+
+Now, let's check out the relationship with body_mass
+```{r}
+penguin_data <- penguin_data |> drop_na()
+ggplot(penguin_data, aes(x = body_mass_g, y = bill_length_mm)) +
+ geom_point() + 
+  geom_smooth(method = "lm", se = FALSE)
+
+```
+
+
 Building three penguin models
 ```{r}
 penguin_model_8 <- stan_glm(
-  bill_length_mm ~ sex,
+  bill_length_mm ~ bill_depth_mm,
   data = penguin_data, family = gaussian, 
-  prior_intercept = normal(3100, 50),
-  prior = normal(30, 2.5, autoscale = TRUE), 
+  prior_intercept = normal(50, 5),
+  prior = normal(-1.5, 0.005, autoscale = TRUE), 
   prior_aux = exponential(0.001, autoscale = TRUE),
   chains = 4, iter = 4000*2, seed = 84735, verbose=FALSE)
 
 penguin_model_9 <- stan_glm(
-  bill_length_mm ~ island,
+  bill_length_mm ~ body_mass_g,
   data = penguin_data, family = gaussian, 
-  prior_intercept = normal(3100, 50),
-  prior = normal(30, 2.5, autoscale = TRUE), 
+  prior_intercept = normal(35, 5),
+  prior = normal(0.005, 0.005, autoscale = TRUE), 
   prior_aux = exponential(0.001, autoscale = TRUE),
   chains = 4, iter = 4000*2, seed = 84735, verbose=FALSE)
 
 penguin_model_10 <- stan_glm(
-  bill_length_mm ~ sex + island +sex:island,
+  bill_length_mm ~ bill_depth_mm+body_mass_g,
   data = penguin_data, family = gaussian, 
-  prior_intercept = normal(3100, 50),
-  prior = normal(30, 2.5, autoscale = TRUE), 
+  prior_intercept = normal(50, 5),
+  prior = normal(0, 0.005, autoscale = TRUE), 
   prior_aux = exponential(0.001, autoscale = TRUE),
   chains = 4, iter = 4000*2, seed = 84735, verbose=FALSE)
 ```
 
 b. Evaluating models
+
+```{r}
+pp_check(penguin_model_8)
+pp_check(penguin_model_9)
+pp_check(penguin_model_10)
+```
+
+
 ```{r}
 prediction_summary_cv(model = penguin_model_8, data = penguin_data, k = 10)
 prediction_summary_cv(model = penguin_model_9, data = penguin_data, k = 10)
 prediction_summary_cv(model = penguin_model_10, data = penguin_data, k = 10)
 ```
 
-I prefer model...
-
+As we can see from both the pp_check plots and the error statistics, the third model is significantly worse than the first two, likely due to the fact that the priors for the first two models were inferred from the data, while for the last model the prior was not able to be inferred from the data. Of the first two models, I prefer the second, for the posterior predictive distribution better matches the observed distribution, and the error statistics are smaller. 
 
 ## Exercise 11.15
 Downloading weather data
@@ -338,13 +372,21 @@ data("weather_perth")
 weather_data <- weather_perth |> drop_na()
 ```
 
-Building  weather models
+First, check out the data
+```{r}
+ggplot(weather_data, aes(x = windspeed9am, y = windspeed3pm)) +
+ geom_point() + 
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+
+Building  weather model
 ```{r}
 weather_model <- stan_glm(
-  bill_length_mm ~ sex,
-  data = penguin_data, family = gaussian, 
-  prior_intercept = normal(3100, 50),
-  prior = normal(30, 2.5, autoscale = TRUE), 
+  windspeed3pm ~ windspeed9am,
+  data = weather_data, family = gaussian, 
+  prior_intercept = normal(10, 2),
+  prior = normal(0.4, 0.005, autoscale = TRUE), 
   prior_aux = exponential(0.001, autoscale = TRUE),
   chains = 4, iter = 4000*2, seed = 84735, verbose=FALSE)
 
@@ -361,5 +403,5 @@ pp_check(weather_model)
 prediction_summary_cv(model = weather_model, data = weather_data, k = 10)
 ```
 
-Findings...
+The pp_check illustrates that the posterior predictive disribution pretty closely maps onto the observed distribution. The error statistics confirm this: the MAE scaled is 0.736 and around 46% of data values are within the 50% posterior predictive interval. Therefore, I'd say the model is pretty good, with the caveat that the prior values were inferred from the data, so it is at risk of overfitting.
 
