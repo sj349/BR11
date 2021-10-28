@@ -1,0 +1,365 @@
+---
+title: "BR11"
+author: "Steph Jordan"
+output: html_notebook
+---
+
+```{r}
+library(bayesrules)
+library(rstanarm)
+library(bayesplot)
+library(tidyverse)
+library(broom.mixed)
+library(tidybayes)
+```
+
+
+## Exercise 11.1 
+
+If we find a relationship between two independent variables and the dependent variable (and those two independent variables are independent of eachother), then we might want to build a model that incorporates both of their influences' on the outcome variable.
+
+## Exercise 11.2
+
+a. Ford is the reference category
+
+b. The difference in a Ford car's miles per gallon and a Subaru car's miles per gallon.
+
+c. The typical miles per gallon of a Ford car. 
+
+## Exercise 11.3
+
+a. B0 represents the typical size of a Mr Stripey tomato at 0 days of growth; B1 represents the amount a tomato increases in weight for 1 more day of growth; B2 represents the typical difference in weights between a Mr Stripey tomato and a Roma tomato at any day of age. 
+
+b. If B2 were 0 there would be no difference in weight between Roma and Mr Stripey tomatoes. 
+
+## Exercise 11.4
+
+a. The relationship between tomato size and age varies depending on the type of tomato.
+
+b. B3 represents the differences in the relationship between age and weight for the 2 different types of tomatoes (the different slopes that each of these relationships possess).
+
+## Exercise 11.5
+sketching
+
+## Exercise 11.6
+
+a. By adding more predictors, we can improve the predictive accuracy of our posterior model.
+
+b. By removing predictors, we can better isolate the relationship between two variables. 
+
+c. Height. Height has been found to correlate with foot size.
+
+d. Whether the child knows how to swim. I think the relationship between swimming ability and shoe size would be spurious, and would uncessarily complicate the model. 
+
+## Exercise 11.7
+
+a. A good model produces a posterior distribution that closely matches the observed distribution; has a low MAE scaled; has a high percentage of values that fall within the within_50 interval. 
+
+b. A bad model has a posterior distribution that deviates strongly from the shape of the observed distribution (perhaps the wrong type of model was chosen); has a high MAE scaled; has a low percentage of values that fall within the within_50 and within_95 interval.
+
+## Exercise 11.8
+
+1) visualization: use pp_check() to compare shape of observed and predicted distributions; use pp_intervals() to visually assess how the observed values compare to the posterior predicted intervals 
+2) cross-validation: break the data set into k>=10 different folds; see how the model performs on each of these different subsets of the main dataset through observing the MAE, MAE scaled values, within_50, and within_95 for each fold (the methodology of the folds is that the first iteration trains on the first 9 subsets and tests on the 10th subset; the second iteration trains on the 2-10 and tests on the 1st; the third iteration trains on 1 and 3-10 and tests on the 2nd, etc...). 
+3) ELPD: the larger the expected logged posterior predictive pdf across a new set of data points, the more accurate the posterior predictions of y. Calculate the ELPD for each model, and then compare them by looking at the absolute differences and the standard error differences. 
+
+
+
+## Exercise 11.9
+
+We want to include enough predictors that our model is accurate (i.e. closely fit to our data), but not so many predictors that our model is "overfit" (i.e. biased). Therefore, when considering how many predictor variables to include, we entertain the bias-variance tradeoff, considering the fact that we don't want our model to be biased (overfit) nor do we want it to have too much variance (want it to be an accurate predictor).
+
+## Exercise 11.10
+
+a. Plotting penguin data
+```{r}
+data("penguins_bayes")
+# Alternative penguin data
+penguin_data <- penguins_bayes |>
+  filter(species %in% c("Adelie", "Gentoo")) |> drop_na()
+```
+
+```{r}
+ggplot(penguin_data, aes(x = flipper_length_mm, y = body_mass_g, color=species)) +
+ geom_point() + 
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+
+b. Building the model
+```{r}
+penguin_model_1 <- stan_glm(
+  body_mass_g ~ flipper_length_mm + species,
+  data = penguin_data, family = gaussian, 
+  prior_intercept = normal(3100, 50),
+  prior = normal(33, 2.5, autoscale = TRUE), 
+  prior_aux = exponential(0.001, autoscale = TRUE),
+  chains = 4, iter = 4000*2, seed = 84735, verbose=FALSE)
+```
+
+c. Checking out some visual and numerical diagnostics of the model
+
+```{r}
+pp_check(penguin_model_1)
+```
+
+Check out some draws from our model
+```{r}
+penguin_data %>%
+  add_fitted_draws(penguin_model_1, n = 50) %>%
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, color = species)) +
+    geom_line(aes(y = .value, group = paste(species, .draw)), alpha = 0.1)
+```
+
+
+```{r}
+set.seed(84735)
+predictions_1 <- posterior_predict(penguin_model_1, newdata = penguin_data)
+
+
+ppc_intervals_grouped(penguin_data$body_mass_g, yrep = predictions_1, 
+                      x = penguin_data$flipper_length_mm, group = penguin_data$species,
+                      prob = 0.5, prob_outer = 0.95,
+                      facet_args = list(scales = "fixed")) + 
+  labs(x = "flipper_length_mm", y = "body_mass_g")
+```
+From both of these visual diagnostics, we can see that our model follows the shape of the distribution pretty well, and that the majority of our predicted values fall within at least the 95% posterior prediction interval. 
+
+Some numerical summaries
+```{r}
+prediction_summary_cv(model = penguin_model_1, data = penguin_data, k = 10)
+```
+The numerical statistics confirm what the visualizations demonstrated--most (95%) of our data are within the 95% prediction interval, and close to half are within the 50% prediction interval.
+
+d. Creating a tidy() summary of the model
+```{r}
+tidy(penguin_model_1, effects = c("fixed", "aux"),
+     conf.int = TRUE, conf.level = 0.80)
+```
+
+The flipper_length_mm coefficient refers to the amount of increase in body_mass caused by a one unit change in flipper_length for Adelie penguins. The speciesGentoo coefficient refers to the difference in body_mass_g for a given flipper_length between the Adelie and Gentoo species. 
+
+e. Simulating and plotting posterior model for an Adelie penguin with flipper length 197.
+```{r}
+# Simulate a set of predictions
+set.seed(84735)
+prediction <- posterior_predict(
+  penguin_model_1,
+  newdata = data.frame(flipper_length_mm= 197, 
+                       species = "Adelie"))
+
+# Plot the posterior predictive models
+mcmc_areas(prediction) +
+  xlab("body_mass_g")
+```
+The body_mass of an Adelie penguin with flipper length 197 is around 3700, with likely values ranging from 3250 to 4000.
+
+## Exercise 11.11
+
+a. Modeling body mass by flipper length and species including an interaction term.
+```{r}
+penguin_model_2 <- stan_glm(
+  body_mass_g ~ flipper_length_mm + species + flipper_length_mm:species,
+  data = penguin_data, family = gaussian, 
+  prior_intercept = normal(3100, 50),
+  prior = normal(33, 2.5, autoscale = TRUE), 
+  prior_aux = exponential(0.001, autoscale = TRUE),
+  chains = 4, iter = 4000*2, seed = 84735, verbose=FALSE)
+```
+
+b. Simulating and plotting 50 posterior lines
+
+```{r}
+penguin_data %>%
+  add_fitted_draws(penguin_model_2, n = 50) %>%
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, color = species)) +
+    geom_line(aes(y = .value, group = paste(species, .draw)), alpha = 0.1)
+```
+
+
+The slope of the line is slightly less steep than the model without the interaction term for both Adelie and Gentoo penguins. This implies that the interaction "dampens" the strength of the relationship between flipper_length and body_mass for both species. We can estimate the overall slope (including the relationship between flipper_length_mm and body_mass_g and the relationship between the interaction between flipper_length_mm/species and body_mass_g) as around 33 for Adelie penguins, and 50 for Gentoo penguins. 
+
+c. Using tidy() summary
+```{r}
+tidy(penguin_model_2, effects = c("fixed", "aux"),
+     conf.int = TRUE, conf.level = 0.80)
+```
+Let's also look at the error summary
+```{r}
+prediction_summary_cv(model = penguin_model_2, data = penguin_data, k = 10)
+```
+
+
+The coefficient for the speciesGentoo term changed significantly with the interaction term included in the regression model (from 234 to -3899) despite the fact that we used the same priors (so the only difference between the two models was the interaction term). Therefore, the interaction must have a strong effect, for when we allow the interaction to be present, the species coefficient changes in value greatly. (CHECK ERROR STATS)
+
+
+## Exercise 11.12
+
+a. Simulating model with 3 predictors
+```{r}
+penguin_model_3 <- stan_glm(
+  body_mass_g ~ flipper_length_mm + bill_length_mm + bill_depth_mm,
+  data = penguin_data, family = gaussian, 
+  prior_intercept = normal(3100, 50),
+  prior = normal(33, 2.5, autoscale = TRUE), 
+  prior_aux = exponential(0.001, autoscale = TRUE),
+  chains = 4, iter = 4000*2, seed = 84735, verbose=FALSE)
+```
+
+b. Using posterior_interval() to produce 95% credible intervals for the model parameters
+```{r}
+posterior_interval(penguin_model_3, prob=0.8)
+```
+
+c. All variables have a positive association with body mass.
+
+## Exercise 11.13
+
+a. Simulating the 4 models:
+```{r}
+penguin_model_4 <- stan_glm(
+  body_mass_g ~ flipper_length_mm,
+  data = penguin_data, family = gaussian, 
+  prior_intercept = normal(3100, 50),
+  prior = normal(30, 2.5, autoscale = TRUE), 
+  prior_aux = exponential(0.001, autoscale = TRUE),
+  chains = 4, iter = 4000*2, seed = 84735, verbose=FALSE)
+
+penguin_model_5 <- stan_glm(
+  body_mass_g ~ species,
+  data = penguin_data, family = gaussian, 
+  prior_intercept = normal(3100, 50),
+  prior = normal(30, 2.5, autoscale = TRUE), 
+  prior_aux = exponential(0.001, autoscale = TRUE),
+  chains = 4, iter = 4000*2, seed = 84735, verbose=FALSE)
+
+penguin_model_6 <- stan_glm(
+  body_mass_g ~ flipper_length_mm +species,
+  data = penguin_data, family = gaussian, 
+  prior_intercept = normal(3100, 50),
+  prior = normal(30, 2.5, autoscale = TRUE), 
+  prior_aux = exponential(0.001, autoscale = TRUE),
+  chains = 4, iter = 4000*2, seed = 84735, verbose=FALSE)
+
+penguin_model_7 <- stan_glm(
+  body_mass_g ~ flipper_length_mm +bill_length_mm + bill_depth_mm,
+  data = penguin_data, family = gaussian, 
+  prior_intercept = normal(3100, 50),
+  prior = normal(30, 2.5, autoscale = TRUE), 
+  prior_aux = exponential(0.001, autoscale = TRUE),
+  chains = 4, iter = 4000*2, seed = 84735, verbose=FALSE)
+
+```
+
+b. Checking the models using pp_check()
+```{r}
+pp_check(penguin_model_4)
+pp_check(penguin_model_5)
+pp_check(penguin_model_6)
+pp_check(penguin_model_7)
+```
+
+c. Running prediction_summary_cv()
+```{r}
+prediction_summary_cv(model = penguin_model_4, data = penguin_data, k = 10)
+```
+
+```{r}
+prediction_summary_cv(model = penguin_model_5, data = penguin_data, k = 10)
+```
+
+```{r}
+prediction_summary_cv(model = penguin_model_6, data = penguin_data, k = 10)
+```
+
+```{r}
+prediction_summary_cv(model = penguin_model_7, data = penguin_data, k = 10)
+```
+
+d. Comparing ELPD for all 4 models
+```{r}
+# Calculate ELPD for the 4 models
+set.seed(84735)
+loo_1 <- loo(penguin_model_4)
+loo_2 <- loo(penguin_model_5)
+loo_3 <- loo(penguin_model_6)
+loo_4 <- loo(penguin_model_7)
+
+# Results
+c(loo_1$estimates[1], loo_2$estimates[1], 
+  loo_3$estimates[1], loo_4$estimates[1])
+
+```
+
+e. 
+## Exercise 11.14
+Building three penguin models
+```{r}
+penguin_model_8 <- stan_glm(
+  bill_length_mm ~ sex,
+  data = penguin_data, family = gaussian, 
+  prior_intercept = normal(3100, 50),
+  prior = normal(30, 2.5, autoscale = TRUE), 
+  prior_aux = exponential(0.001, autoscale = TRUE),
+  chains = 4, iter = 4000*2, seed = 84735, verbose=FALSE)
+
+penguin_model_9 <- stan_glm(
+  bill_length_mm ~ island,
+  data = penguin_data, family = gaussian, 
+  prior_intercept = normal(3100, 50),
+  prior = normal(30, 2.5, autoscale = TRUE), 
+  prior_aux = exponential(0.001, autoscale = TRUE),
+  chains = 4, iter = 4000*2, seed = 84735, verbose=FALSE)
+
+penguin_model_10 <- stan_glm(
+  bill_length_mm ~ sex + island +sex:island,
+  data = penguin_data, family = gaussian, 
+  prior_intercept = normal(3100, 50),
+  prior = normal(30, 2.5, autoscale = TRUE), 
+  prior_aux = exponential(0.001, autoscale = TRUE),
+  chains = 4, iter = 4000*2, seed = 84735, verbose=FALSE)
+```
+
+b. Evaluating models
+```{r}
+prediction_summary_cv(model = penguin_model_8, data = penguin_data, k = 10)
+prediction_summary_cv(model = penguin_model_9, data = penguin_data, k = 10)
+prediction_summary_cv(model = penguin_model_10, data = penguin_data, k = 10)
+```
+
+I prefer model...
+
+
+## Exercise 11.15
+Downloading weather data
+```{r}
+data("weather_perth")
+# Alternative penguin data
+weather_data <- weather_perth |> drop_na()
+```
+
+Building  weather models
+```{r}
+weather_model <- stan_glm(
+  bill_length_mm ~ sex,
+  data = penguin_data, family = gaussian, 
+  prior_intercept = normal(3100, 50),
+  prior = normal(30, 2.5, autoscale = TRUE), 
+  prior_aux = exponential(0.001, autoscale = TRUE),
+  chains = 4, iter = 4000*2, seed = 84735, verbose=FALSE)
+
+```
+
+b. Evaluating model
+
+```{r}
+pp_check(weather_model)
+```
+
+
+```{r}
+prediction_summary_cv(model = weather_model, data = weather_data, k = 10)
+```
+
+Findings...
+
