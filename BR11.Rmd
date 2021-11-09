@@ -2,6 +2,7 @@
 title: "BR11"
 author: "Steph Jordan"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
 ---
@@ -91,7 +92,7 @@ ggplot(penguin_data, aes(x = flipper_length_mm, y = body_mass_g, color=species))
 
 
 b. Building the model
-```{r}
+```{r, results=FALSE, echo=FALSE}
 penguin_model_1 <- stan_glm(
   body_mass_g ~ flipper_length_mm + species,
   data = penguin_data, family = gaussian, 
@@ -191,8 +192,18 @@ tidy(penguin_model_2, effects = c("fixed", "aux"),
      conf.int = TRUE, conf.level = 0.80)
 ```
 
-The coefficient for the speciesGentoo term changed significantly with the interaction term included in the regression model (from 234 to -3899) despite the fact that we used the same priors (so the only difference between the two models was the interaction term). Therefore, the interaction must have a strong effect, for when we allow the interaction to be present, the species coefficient changes in value greatly. (CHECK THIS LOGIC )
+Bring in some loo comparisons to evaluate models relative to eachother:
+```{r}
+set.seed(84735)
+loo_1 <- loo(penguin_model_1)
+loo_2 <- loo(penguin_model_2)
 
+loo_compare(loo_1, loo_2)
+
+```
+
+
+Theoretically, it would make sense that this interaction term would be essential--it seems likely that the relationship between flipper_length_mm and body_mass would vary based on species. Empirically, this is confirmed. The loo for the second model is greater than the loo for the first model; therefore, the second model (with the interaction term) performs better than the first--however, this also possibly due to overfitting. 
 
 ## Exercise 11.12
 
@@ -260,7 +271,7 @@ pp_check(penguin_model_6)
 pp_check(penguin_model_7)
 ```
 
-c. Running prediction_summary_cv()
+c. Running prediction_summary_cv() for all 4 models
 ```{r}
 prediction_summary_cv(model = penguin_model_4, data = penguin_data, k = 10)
 ```
@@ -403,5 +414,8 @@ pp_check(weather_model)
 prediction_summary_cv(model = weather_model, data = weather_data, k = 10)
 ```
 
-The pp_check illustrates that the posterior predictive disribution pretty closely maps onto the observed distribution. The error statistics confirm this: the MAE scaled is 0.736 and around 46% of data values are within the 50% posterior predictive interval. Therefore, I'd say the model is pretty good, with the caveat that the prior values were inferred from the data, so it is at risk of overfitting.
+The pp_check illustrates that the posterior predictive disribution pretty closely maps onto the observed distribution. The error statistics confirm this: the MAE scaled is 0.736 and around 46% of data values are within the 50% posterior predictive interval. Therefore, I'd say the model is pretty good, with the caveat that the prior values were inferred from the data, so the posterior model is at risk of overfitting--that is, not performing well on other datasets, since both the data and the prior hypotheses come from the same dataset.
 
+## Final Project Notes
+
+For my final project, I'm planning to look for a data set on social media usage and concern for digital privacy. I am curious to see how frequency of usage affects one's level of awareness/concern for privacy. I also want to see how other demographic variables relate to social media usage--including age, gender, geographic location and SES. I'm not sure I'll be able to find a dataset on this...if you have any recommendations for something similar, let me know! 
