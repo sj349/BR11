@@ -2,9 +2,9 @@
 title: "BR11"
 author: "Steph Jordan"
 output:
-  pdf_document: default
   html_document:
     df_print: paged
+  pdf_document: default
 ---
 
 ```{r}
@@ -92,14 +92,14 @@ ggplot(penguin_data, aes(x = flipper_length_mm, y = body_mass_g, color=species))
 
 
 b. Building the model
-```{r, results=FALSE, echo=FALSE}
+```{r, results='hide'}
 penguin_model_1 <- stan_glm(
   body_mass_g ~ flipper_length_mm + species,
-  data = penguin_data, family = gaussian, 
+  data = penguin_data, refresh=0, family = gaussian, 
   prior_intercept = normal(3100, 50),
   prior = normal(33, 2.5, autoscale = TRUE), 
   prior_aux = exponential(0.001, autoscale = TRUE),
-  chains = 4, iter = 4000*2, seed = 84735, verbose=FALSE)
+  chains = 4, iter = 4000*2, seed = 84735)
 ```
 
 c. Checking out some visual and numerical diagnostics of the model
@@ -164,10 +164,10 @@ The body_mass of an Adelie penguin with flipper length 197 is around 3700, with 
 ## Exercise 11.11
 
 a. Modeling body mass by flipper length and species including an interaction term.
-```{r}
+```{r, results='hide'}
 penguin_model_2 <- stan_glm(
   body_mass_g ~ flipper_length_mm + species + flipper_length_mm:species,
-  data = penguin_data, family = gaussian, 
+  data = penguin_data, family = gaussian, refresh=0, 
   prior_intercept = normal(3100, 50),
   prior = normal(33, 2.5, autoscale = TRUE), 
   prior_aux = exponential(0.001, autoscale = TRUE),
@@ -211,7 +211,7 @@ a. Simulating model with 3 predictors
 ```{r}
 penguin_model_3 <- stan_glm(
   body_mass_g ~ flipper_length_mm + bill_length_mm + bill_depth_mm,
-  data = penguin_data, family = gaussian, 
+  data = penguin_data, family = gaussian, refresh=0, 
   prior_intercept = normal(3100, 50),
   prior = normal(33, 2.5, autoscale = TRUE), 
   prior_aux = exponential(0.001, autoscale = TRUE),
@@ -231,7 +231,7 @@ a. Simulating the 4 models:
 ```{r}
 penguin_model_4 <- stan_glm(
   body_mass_g ~ flipper_length_mm,
-  data = penguin_data, family = gaussian, 
+  data = penguin_data, family = gaussian, refresh=0, 
   prior_intercept = normal(3100, 50),
   prior = normal(30, 2.5, autoscale = TRUE), 
   prior_aux = exponential(0.001, autoscale = TRUE),
@@ -239,7 +239,7 @@ penguin_model_4 <- stan_glm(
 
 penguin_model_5 <- stan_glm(
   body_mass_g ~ species,
-  data = penguin_data, family = gaussian, 
+  data = penguin_data, family = gaussian, refresh=0, 
   prior_intercept = normal(3100, 50),
   prior = normal(30, 2.5, autoscale = TRUE), 
   prior_aux = exponential(0.001, autoscale = TRUE),
@@ -247,7 +247,7 @@ penguin_model_5 <- stan_glm(
 
 penguin_model_6 <- stan_glm(
   body_mass_g ~ flipper_length_mm +species,
-  data = penguin_data, family = gaussian, 
+  data = penguin_data, family = gaussian, refresh=0, 
   prior_intercept = normal(3100, 50),
   prior = normal(30, 2.5, autoscale = TRUE), 
   prior_aux = exponential(0.001, autoscale = TRUE),
@@ -255,7 +255,7 @@ penguin_model_6 <- stan_glm(
 
 penguin_model_7 <- stan_glm(
   body_mass_g ~ flipper_length_mm +bill_length_mm + bill_depth_mm,
-  data = penguin_data, family = gaussian, 
+  data = penguin_data, family = gaussian, refresh=0, 
   prior_intercept = normal(3100, 50),
   prior = normal(30, 2.5, autoscale = TRUE), 
   prior_aux = exponential(0.001, autoscale = TRUE),
@@ -308,7 +308,7 @@ loo_compare(loo_1, loo_2, loo_3, loo_4)
 ```
 
 
-e. The 4th model (in our code, penguin_model_7) has the lowest MAE_scaled (0.722), and the highest percentage of values within the 50% posterior predicted interval. The 4th model also has the best ELPD (the larger the ELPD, the more accurate the predictions)--we know this because loo_compare outputs the best model, and then lists all other models in comparison to the best model. Therefore, I would say the 4th model is the best.
+e.  Penguin_model_7 has the lowest MAE_scaled (0.722), and the highest percentage of values within the 50% posterior predicted interval. Penguin_model_7 also has the best ELPD (the larger the ELPD, the more accurate the predictions)--we know this because loo_compare outputs the best model, and then lists all other models in comparison to the best model. Therefore, I would say the model 7 is the best.
 
 
 ## Exercise 11.14
@@ -335,7 +335,7 @@ Building three penguin models
 ```{r}
 penguin_model_8 <- stan_glm(
   bill_length_mm ~ bill_depth_mm,
-  data = penguin_data, family = gaussian, 
+  data = penguin_data, refresh=0, family = gaussian, 
   prior_intercept = normal(50, 5),
   prior = normal(-1.5, 0.005, autoscale = TRUE), 
   prior_aux = exponential(0.001, autoscale = TRUE),
@@ -343,7 +343,7 @@ penguin_model_8 <- stan_glm(
 
 penguin_model_9 <- stan_glm(
   bill_length_mm ~ body_mass_g,
-  data = penguin_data, family = gaussian, 
+  data = penguin_data, refresh=0, family = gaussian, 
   prior_intercept = normal(35, 5),
   prior = normal(0.005, 0.005, autoscale = TRUE), 
   prior_aux = exponential(0.001, autoscale = TRUE),
@@ -351,7 +351,7 @@ penguin_model_9 <- stan_glm(
 
 penguin_model_10 <- stan_glm(
   bill_length_mm ~ bill_depth_mm+body_mass_g,
-  data = penguin_data, family = gaussian, 
+  data = penguin_data, refresh=0, family = gaussian, 
   prior_intercept = normal(50, 5),
   prior = normal(0, 0.005, autoscale = TRUE), 
   prior_aux = exponential(0.001, autoscale = TRUE),
@@ -394,7 +394,7 @@ ggplot(weather_data, aes(x = windspeed9am, y = windspeed3pm)) +
 Building  weather model
 ```{r}
 weather_model <- stan_glm(
-  windspeed3pm ~ windspeed9am,
+  windspeed3pm ~ windspeed9am, refresh=0, 
   data = weather_data, family = gaussian, 
   prior_intercept = normal(10, 2),
   prior = normal(0.4, 0.005, autoscale = TRUE), 
